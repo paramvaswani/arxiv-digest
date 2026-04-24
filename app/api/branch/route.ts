@@ -2,9 +2,9 @@ import { NextRequest } from "next/server";
 import type { PaperMeta } from "@/app/lib/arxiv";
 import { STACK_CONTEXT } from "@/app/lib/stack";
 import {
-  hasAnthropicKey,
+  hasGeminiKey,
   makeSSEStream,
-  streamAnthropic,
+  streamGemini,
   streamStub,
 } from "@/app/lib/stream";
 import { relatedPapers, type RelatedPaperStub } from "@/app/lib/related";
@@ -92,14 +92,13 @@ export async function POST(req: NextRequest) {
       const userBlock = buildPrompt(body, related);
 
       let full = "";
-      if (hasAnthropicKey()) {
-        full = await streamAnthropic(
+      if (hasGeminiKey()) {
+        full = await streamGemini(
           {
             system: [
               {
                 type: "text",
                 text: STACK_CONTEXT,
-                cache_control: { type: "ephemeral" },
               },
             ],
             userBlock,

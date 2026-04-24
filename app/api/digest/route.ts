@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 import { NextRequest } from "next/server";
 import { fetchArxivPaper, parseArxivId, type PaperMeta } from "@/app/lib/arxiv";
 import { STACK_CONTEXT } from "@/app/lib/stack";
@@ -6,7 +6,10 @@ import { STACK_CONTEXT } from "@/app/lib/stack";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const anthropic = new Anthropic();
+function getAI(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
+  return new GoogleGenAI({ apiKey });
+}
 
 type DigestBody = {
   verdict: "must-read" | "worth-skimming" | "skip";
@@ -81,25 +84,17 @@ Write a digest for Param. Return ONLY valid JSON matching this TypeScript type â
   "questions": string[]                            // 2-3 open questions this paper raises for Param's work.
 }`;
 
-  const msg = await anthropic.messages.create({
-    model: "claude-opus-4-7",
-    max_tokens: 2000,
-    system: [
-      {
-        type: "text",
-        text: STACK_CONTEXT,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    messages: [{ role: "user", content: userBlock }],
+  const response = await getAI().models.generateContent({
+    model: "gemini-2.5-pro",
+    contents: [{ role: "user", parts: [{ text: userBlock }] }],
+    config: {
+      systemInstruction: STACK_CONTEXT,
+      maxOutputTokens: 2000,
+      responseMimeType: "application/json",
+    },
   });
 
-  const text = msg.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n")
-    .trim();
-
+  const text = (response.text ?? "").trim();
   const json = extractJson(text);
   return JSON.parse(json) as DigestBody;
 }

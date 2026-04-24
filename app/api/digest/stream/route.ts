@@ -2,9 +2,9 @@ import { NextRequest } from "next/server";
 import { fetchArxivPaper, parseArxivId } from "@/app/lib/arxiv";
 import { STACK_CONTEXT } from "@/app/lib/stack";
 import {
-  hasAnthropicKey,
+  hasGeminiKey,
   makeSSEStream,
-  streamAnthropic,
+  streamGemini,
   streamStub,
 } from "@/app/lib/stream";
 
@@ -63,14 +63,13 @@ Write a digest for Param. Return ONLY valid JSON matching this TypeScript type â
 }`;
 
       let full = "";
-      if (hasAnthropicKey()) {
-        full = await streamAnthropic(
+      if (hasGeminiKey()) {
+        full = await streamGemini(
           {
             system: [
               {
                 type: "text",
                 text: STACK_CONTEXT,
-                cache_control: { type: "ephemeral" },
               },
             ],
             userBlock,

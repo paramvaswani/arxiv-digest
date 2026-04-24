@@ -1,9 +1,11 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 
 export type SSEController = {
   send: (event: string, data: unknown) => void;
   close: () => void;
 };
+
+export type SystemBlock = { type: "text"; text: string };
 
 export function makeSSEStream(): {
   stream: ReadableStream<Uint8Array>;
@@ -36,38 +38,38 @@ export function makeSSEStream(): {
   return { stream, controller: { send, close } };
 }
 
-export function hasAnthropicKey(): boolean {
-  return !!process.env.ANTHROPIC_API_KEY;
+export function hasGeminiKey(): boolean {
+  return !!process.env.GEMINI_API_KEY || !!process.env.GOOGLE_API_KEY;
 }
 
-export async function streamAnthropic(
+export async function streamGemini(
   opts: {
-    system: Array<Anthropic.TextBlockParam>;
+    system: Array<SystemBlock>;
     userBlock: string;
     maxTokens?: number;
   },
   controller: SSEController,
   signal: AbortSignal,
 ): Promise<string> {
-  const anthropic = new Anthropic();
-  let full = "";
-  const stream = anthropic.messages.stream(
-    {
-      model: "claude-opus-4-7",
-      max_tokens: opts.maxTokens ?? 2000,
-      system: opts.system,
-      messages: [{ role: "user", content: opts.userBlock }],
-    },
-    { signal },
-  );
+  const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
+  const ai = new GoogleGenAI({ apiKey });
 
-  for await (const event of stream) {
+  const systemText = opts.system.map((b) => b.text).join("\n\n");
+
+  let full = "";
+  const response = await ai.models.generateContentStream({
+    model: "gemini-2.5-pro",
+    contents: [{ role: "user", parts: [{ text: opts.userBlock }] }],
+    config: {
+      systemInstruction: systemText,
+      maxOutputTokens: opts.maxTokens ?? 2000,
+    },
+  });
+
+  for await (const chunk of response) {
     if (signal.aborted) break;
-    if (
-      event.type === "content_block_delta" &&
-      event.delta.type === "text_delta"
-    ) {
-      const t = event.delta.text;
+    const t = chunk.text;
+    if (t) {
       full += t;
       controller.send("token", { t });
     }
@@ -76,10 +78,10 @@ export async function streamAnthropic(
 }
 
 const STUB_SENTENCES = [
-  "Stub generator active — no ANTHROPIC_API_KEY detected in the environment.",
+  "Stub generator active — no GEMINI_API_KEY detected in the environment.",
   "This path exists so the demo still feels alive when the key is missing.",
   "Tokens are emitted on a gentle cadence, mimicking the real streaming surface.",
-  "When you wire a real key into .env.local, this fallback disappears and Opus takes over.",
+  "When you wire a real key into .env.local, this fallback disappears and Gemini takes over.",
   "The reading-depth tree, undo stack, and markdown export all run identically against either source.",
 ];
 
