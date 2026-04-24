@@ -62,7 +62,7 @@ export async function streamGemini(
     contents: [{ role: "user", parts: [{ text: opts.userBlock }] }],
     config: {
       systemInstruction: systemText,
-      maxOutputTokens: opts.maxTokens ?? 2000,
+      maxOutputTokens: opts.maxTokens ?? 4000,
     },
   });
 
